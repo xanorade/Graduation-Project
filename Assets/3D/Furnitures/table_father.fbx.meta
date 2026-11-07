@@ -1,9 +1,14 @@
 fileFormatVersion: 2
-guid: cf5d715429560ee4bb40620fda5a1337
+guid: 7a7362e1a65869441a37996f3b3d9d1b
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: openPBR_shader1
+    second: {fileID: 2100000, guid: 68d9464d0cd4fbf48a81abf378167c7f, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -50,7 +55,7 @@ ModelImporter:
     useFileUnits: 1
     keepQuads: 0
     weldVertices: 1
-    bakeAxisConversion: 1
+    bakeAxisConversion: 0
     preserveHierarchy: 0
     skinWeightsMode: 0
     maxBonesPerVertex: 4
