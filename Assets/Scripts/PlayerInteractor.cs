@@ -16,6 +16,10 @@ public class PlayerInteractor : MonoBehaviour
     [Header("Settings")]
     [SerializeField] private float interactionDistance = 2.5f;
 
+    [SerializeField] private PlayerHiding playerHiding;
+
+    private HideSpot currentHideSpot;
+
     private DoorInteractable currentDoor;
     private DoorInteractable messageDoor;
 
@@ -39,6 +43,14 @@ public class PlayerInteractor : MonoBehaviour
 
     private void Update()
     {
+        if (playerHiding != null && playerHiding.IsHiding)
+        {
+            if (interactionPrompt != null)
+                interactionPrompt.gameObject.SetActive(false);
+
+            return;
+        }
+
         FindTarget();
         UpdateMessages();
 
@@ -50,7 +62,21 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        if (currentDoor != null)
+        if (currentHideSpot != null && playerHiding != null)
+        {
+            if (interactionPrompt != null)
+            {
+                interactionPrompt.text = currentHideSpot.GetPrompt();
+                interactionPrompt.gameObject.SetActive(true);
+            }
+
+            if (Keyboard.current != null &&
+                Keyboard.current.eKey.wasPressedThisFrame)
+            {
+                playerHiding.EnterHide(currentHideSpot);
+            }
+        }
+        else if (currentDoor != null)
         {
             if (interactionPrompt != null)
             {
@@ -74,6 +100,7 @@ public class PlayerInteractor : MonoBehaviour
     private void FindTarget()
     {
         currentDoor = null;
+        currentHideSpot = null;
 
         if (playerCamera == null)
             return;
@@ -87,10 +114,16 @@ public class PlayerInteractor : MonoBehaviour
             out RaycastHit hit,
             interactionDistance,
             Physics.DefaultRaycastLayers,
-            QueryTriggerInteraction.Ignore))
+            QueryTriggerInteraction.Collide))
         {
-            currentDoor =
-                hit.collider.GetComponentInParent<DoorInteractable>();
+            currentHideSpot =
+                hit.collider.GetComponentInParent<HideSpot>();
+
+            if (currentHideSpot == null)
+            {
+                currentDoor =
+                    hit.collider.GetComponentInParent<DoorInteractable>();
+            }
         }
     }
 
