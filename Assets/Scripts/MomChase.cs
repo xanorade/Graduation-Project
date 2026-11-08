@@ -30,6 +30,18 @@ public class MomChase : MonoBehaviour
 
     [SerializeField] private bool isWandering = false;
 
+    [Header("Player Stealth")]
+    [SerializeField] private PlayerController playerController;
+    [SerializeField] private PlayerHiding playerHiding;
+
+    [SerializeField, Range(0.1f, 1f)]
+    private float standingSightHeightPercent = 0.8f;
+
+    [SerializeField, Range(0.1f, 1f)]
+    private float crouchingSightHeightPercent = 0.55f;
+
+    private CharacterController playerCharacterController;
+
     private bool canSeePlayer;
     private float nextVisionCheckTime;
     private float nextWanderTargetTime;
@@ -41,7 +53,24 @@ public class MomChase : MonoBehaviour
 
         wanderCountdown = timeBeforeWandering;
         isWandering = false;
+
+        if (player != null)
+        {
+            if (playerController == null)
+                playerController = player.GetComponent<PlayerController>();
+
+            playerCharacterController =
+                player.GetComponent<CharacterController>();
+        }
+
+        if (player != null)
+        {
+            if (playerHiding == null)
+                playerHiding = player.GetComponent<PlayerHiding>();
+        }
     }
+
+
 
     private void Update()
     {
@@ -51,12 +80,24 @@ public class MomChase : MonoBehaviour
         if (!agent.isOnNavMesh)
             return;
 
+        bool playerIsHiding =
+            playerHiding != null && playerHiding.IsHiding;
+
+        // Görüş kontrolü
         if (Time.time >= nextVisionCheckTime)
         {
             nextVisionCheckTime = Time.time + updateInterval;
-            canSeePlayer = CanSeePlayer();
+
+            canSeePlayer = playerIsHiding
+                ? false
+                : CanSeePlayer();
         }
 
+        // Saklanıyorsa eski görüş bilgisini de geçersiz kıl.
+        if (playerIsHiding)
+            canSeePlayer = false;
+
+        // 1. Oyuncuyu gerçekten görüyorsa hızlı kovala.
         if (canSeePlayer)
         {
             wanderCountdown = timeBeforeWandering;
@@ -68,6 +109,7 @@ public class MomChase : MonoBehaviour
             return;
         }
 
+        // 2. Oyuncuyu göremiyorsa geri sayım.
         if (!isWandering)
         {
             wanderCountdown = Mathf.Max(
@@ -78,44 +120,82 @@ public class MomChase : MonoBehaviour
             if (wanderCountdown > 0f)
             {
                 SetAgentSpeed(hiddenSpeed);
-                agent.SetDestination(player.position);
+
+                // Oyuncu saklanmıyorsa yavaşça takip et.
+                // Saklanıyorsa son mevcut rotasını koru.
+                if (!playerIsHiding)
+                {
+                    agent.SetDestination(player.position);
+                }
 
                 return;
             }
 
+            // 3. Süre bitti, rastgele dolaşmaya geç.
             isWandering = true;
 
             agent.ResetPath();
-
             nextWanderTargetTime = 0f;
         }
 
+        // 4. Wandering
         SetAgentSpeed(wanderingSpeed);
 
         bool reachedDestination =
             !agent.pathPending &&
             (!agent.hasPath ||
-             agent.remainingDistance <= agent.stoppingDistance + 0.3f);
+             agent.remainingDistance <=
+             agent.stoppingDistance + 0.3f);
 
         if (reachedDestination &&
             Time.time >= nextWanderTargetTime)
         {
-            bool foundDestination = TryChooseRandomDestination();
+            bool foundDestination =
+                TryChooseRandomDestination();
 
             nextWanderTargetTime = Time.time +
                 (foundDestination ? 0.5f : 1f);
         }
     }
 
+
+
     private bool CanSeePlayer()
     {
+        if (playerHiding != null && playerHiding.IsHiding)
+            return false;
+
         Vector3 origin = eyePoint != null
             ? eyePoint.position
             : transform.position + Vector3.up * 1.6f;
 
-        Vector3 targetPoint = playerSightPoint != null
-            ? playerSightPoint.position
-            : player.position + Vector3.up * 1.2f;
+        Vector3 targetPoint;
+
+        if (playerCharacterController != null)
+        {
+            Bounds playerBounds = playerCharacterController.bounds;
+
+            bool crouching =
+                playerController != null &&
+                playerController.IsCrouching;
+
+            float heightPercent = crouching
+                ? crouchingSightHeightPercent
+                : standingSightHeightPercent;
+
+            targetPoint = new Vector3(
+                playerBounds.center.x,
+                playerBounds.min.y +
+                    playerBounds.size.y * heightPercent,
+                playerBounds.center.z
+            );
+        }
+        else
+        {
+            targetPoint = playerSightPoint != null
+                ? playerSightPoint.position
+                : player.position + Vector3.up * 1.2f;
+        }
 
         Vector3 direction = targetPoint - origin;
 
