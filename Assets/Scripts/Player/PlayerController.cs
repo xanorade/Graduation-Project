@@ -44,8 +44,10 @@ public class PlayerController : MonoBehaviour
 
     private bool isExhausted = false;
     public bool IsExhausted => isExhausted;
-
     public bool IsCrouching => isCrouching;
+
+    private bool canSprint = false;
+    public bool CanSprint => canSprint;
 
     private Vector3 moveDirection = Vector3.zero;
     private float lookAngle = 0.0f;
@@ -121,9 +123,10 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            if (!isCrouching &&
-                runInput.IsPressed() &&
-                moveVector.sqrMagnitude > 0f)
+            if (canSprint &&
+    !isCrouching &&
+    runInput.IsPressed() &&
+    moveVector.sqrMagnitude > 0f)
             {
                 currentMoveSpeed = RunSpeed;
                 currentRunDuration -= Time.deltaTime;
@@ -349,5 +352,15 @@ public class PlayerController : MonoBehaviour
             -LookAngleLimit,
             LookAngleLimit
         );
+    }
+    public void UnlockSprint()
+    {
+        canSprint = true;
+
+        currentRunDuration = RunDuration;
+
+        isExhausted = false;
+
+        Debug.Log("Sprint unlocked!");
     }
 }

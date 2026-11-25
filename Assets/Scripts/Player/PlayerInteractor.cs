@@ -23,6 +23,13 @@ public class PlayerInteractor : MonoBehaviour
     private DoorInteractable currentDoor;
     private DoorInteractable messageDoor;
 
+    private InspectableObject currentInspectable;
+    private InspectableObject messageInspectable;
+
+    private ToiletInteractable currentToilet;
+    private bool interactionLocked;
+    public bool IsInteractionLocked => interactionLocked;
+
     private float doorMessageEndTime;
     private float monologueEndTime;
 
@@ -43,6 +50,17 @@ public class PlayerInteractor : MonoBehaviour
 
     private void Update()
     {
+
+        FindTarget();
+        UpdateMessages();
+
+        if (interactionLocked)
+        {
+            if (interactionPrompt != null)
+                interactionPrompt.gameObject.SetActive(false);
+
+            return;
+        }
         if (playerHiding != null && playerHiding.IsHiding)
         {
             if (interactionPrompt != null)
@@ -50,9 +68,6 @@ public class PlayerInteractor : MonoBehaviour
 
             return;
         }
-
-        FindTarget();
-        UpdateMessages();
 
         if (IsMessageVisible())
         {
@@ -76,6 +91,28 @@ public class PlayerInteractor : MonoBehaviour
                 playerHiding.EnterHide(currentHideSpot);
             }
         }
+        else if (currentToilet != null)
+        {
+            if (currentToilet.CanInteract)
+            {
+                if (interactionPrompt != null)
+                {
+                    interactionPrompt.text = currentToilet.GetPrompt();
+                    interactionPrompt.gameObject.SetActive(true);
+                }
+
+                if (Keyboard.current != null &&
+                    Keyboard.current.eKey.wasPressedThisFrame)
+                {
+                    currentToilet.Interact(this);
+                }
+            }
+            else
+            {
+                if (interactionPrompt != null)
+                    interactionPrompt.gameObject.SetActive(false);
+            }
+        }
         else if (currentDoor != null)
         {
             if (interactionPrompt != null)
@@ -90,6 +127,22 @@ public class PlayerInteractor : MonoBehaviour
                 currentDoor.Interact(this);
             }
         }
+        else if (currentInspectable != null)
+        {
+            if (interactionPrompt != null)
+            {
+                interactionPrompt.text =
+                    currentInspectable.GetPrompt();
+
+                interactionPrompt.gameObject.SetActive(true);
+            }
+
+            if (Keyboard.current != null &&
+                Keyboard.current.eKey.wasPressedThisFrame)
+            {
+                currentInspectable.Interact(this);
+            }
+        }
         else
         {
             if (interactionPrompt != null)
@@ -101,6 +154,8 @@ public class PlayerInteractor : MonoBehaviour
     {
         currentDoor = null;
         currentHideSpot = null;
+        currentInspectable = null;
+        currentToilet = null;
 
         if (playerCamera == null)
             return;
@@ -121,33 +176,63 @@ public class PlayerInteractor : MonoBehaviour
 
             if (currentHideSpot == null)
             {
+                currentToilet =
+                    hit.collider.GetComponentInParent<ToiletInteractable>();
+            }
+
+            if (currentHideSpot == null && currentToilet == null)
+            {
                 currentDoor =
                     hit.collider.GetComponentInParent<DoorInteractable>();
+            }
+
+            if (currentHideSpot == null &&
+                currentDoor == null)
+            {
+                currentInspectable =
+                    hit.collider.GetComponentInParent<InspectableObject>();
             }
         }
     }
 
+
     private void UpdateMessages()
     {
+        // Door Inspection / Object Inspection kontrolü
         if (doorInspectionText != null &&
             doorInspectionText.gameObject.activeSelf)
         {
-            bool outOfRange =
-                messageDoor == null ||
-                !messageDoor.IsWithinInteractionRange(
-                    transform.position,
-                    interactionDistance
-                );
+            bool outOfRange = true;
+
+            if (messageDoor != null)
+            {
+                outOfRange =
+                    !messageDoor.IsWithinInteractionRange(
+                        transform.position,
+                        interactionDistance
+                    );
+            }
+            else if (messageInspectable != null)
+            {
+                outOfRange =
+                    !messageInspectable.IsWithinInteractionRange(
+                        transform.position,
+                        interactionDistance
+                    );
+            }
 
             bool expired = Time.time >= doorMessageEndTime;
 
             if (outOfRange || expired)
             {
                 doorInspectionText.gameObject.SetActive(false);
+
                 messageDoor = null;
+                messageInspectable = null;
             }
         }
 
+        // Inner Monologue kontrolü
         if (innerMonologueText != null &&
             innerMonologueText.gameObject.activeSelf)
         {
@@ -157,6 +242,7 @@ public class PlayerInteractor : MonoBehaviour
             }
         }
     }
+
 
     private bool IsMessageVisible()
     {
@@ -176,6 +262,7 @@ public class PlayerInteractor : MonoBehaviour
         DoorInteractable sourceDoor,
         float duration = 3.5f)
     {
+        
         if (doorInspectionText == null ||
             string.IsNullOrWhiteSpace(message))
             return;
@@ -187,6 +274,30 @@ public class PlayerInteractor : MonoBehaviour
         doorInspectionText.gameObject.SetActive(true);
 
         messageDoor = sourceDoor;
+        messageInspectable = null;
+        doorMessageEndTime = Time.time + duration;
+
+        if (interactionPrompt != null)
+            interactionPrompt.gameObject.SetActive(false);
+    }
+    public void ShowObjectInspection(
+    string message,
+    InspectableObject sourceObject,
+    float duration = 3.5f)
+    {
+        if (doorInspectionText == null ||
+            string.IsNullOrWhiteSpace(message))
+            return;
+
+        if (innerMonologueText != null)
+            innerMonologueText.gameObject.SetActive(false);
+
+        doorInspectionText.text = message;
+        doorInspectionText.gameObject.SetActive(true);
+
+        messageDoor = null;
+        messageInspectable = sourceObject;
+
         doorMessageEndTime = Time.time + duration;
 
         if (interactionPrompt != null)
@@ -205,6 +316,7 @@ public class PlayerInteractor : MonoBehaviour
             doorInspectionText.gameObject.SetActive(false);
 
         messageDoor = null;
+        messageInspectable = null;
 
         innerMonologueText.text = message;
         innerMonologueText.gameObject.SetActive(true);
@@ -213,5 +325,15 @@ public class PlayerInteractor : MonoBehaviour
 
         if (interactionPrompt != null)
             interactionPrompt.gameObject.SetActive(false);
+    }
+
+    public void SetInteractionLocked(bool locked)
+    {
+        interactionLocked = locked;
+
+        if (locked && interactionPrompt != null)
+        {
+            interactionPrompt.gameObject.SetActive(false);
+        }
     }
 }

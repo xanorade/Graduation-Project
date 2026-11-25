@@ -9,6 +9,7 @@ public class WakeUpIntro : MonoBehaviour
 
     [Header("Wake Up Settings")]
     [SerializeField] private float lyingPitch = -75f;
+
     [SerializeField]
     private Vector3 lyingPositionOffset =
         new Vector3(0f, -0.85f, 0f);
@@ -20,21 +21,9 @@ public class WakeUpIntro : MonoBehaviour
     private AnimationCurve wakeCurve =
         AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
-    [Header("Disable During Intro")]
-    [SerializeField] private MonoBehaviour[] controlsToDisable;
-
-    [Header("Inner Monologue")]
-    [SerializeField] private PlayerInteractor playerInteractor;
-
-    [SerializeField, TextArea(2, 4)]
-    private string wakingThought =
-        "ugh... i really need to use the bathroom.";
-
-    [SerializeField, TextArea(2, 4)]
-    private string gettingUpThought =
-        "hopefully mom still asleep. i don't want to wake her up.";
-
-    [SerializeField] private float thoughtDuration = 3.5f;
+    [Header("Dialogue")]
+    [SerializeField] private DialogueManager dialogueManager;
+    [SerializeField] private DialogueSequence wakeUpSequence;
 
     private Vector3 standingPosition;
     private Vector3 lyingPosition;
@@ -42,34 +31,59 @@ public class WakeUpIntro : MonoBehaviour
     private Quaternion standingRotation;
     private Quaternion lyingRotation;
 
-    private bool[] previousControlStates;
 
     private void Start()
     {
+        if (cameraPivot == null)
+        {
+            Debug.LogError("CameraPivot atanmamis!", this);
+            enabled = false;
+            return;
+        }
+
+        if (dialogueManager == null || wakeUpSequence == null)
+        {
+            Debug.LogError(
+                "DialogueManager veya WakeUpSequence atanmamis!",
+                this
+            );
+            enabled = false;
+            return;
+        }
+
         standingPosition = cameraPivot.localPosition;
         standingRotation = cameraPivot.localRotation;
 
         lyingPosition = standingPosition + lyingPositionOffset;
 
         lyingRotation =
-            standingRotation * Quaternion.Euler(lyingPitch, 0f, 0f);
+            standingRotation *
+            Quaternion.Euler(lyingPitch, 0f, 0f);
 
         StartCoroutine(WakeUpSequence());
     }
 
-
     private IEnumerator WakeUpSequence()
     {
-        DisableControls();
-
         cameraPivot.localPosition = lyingPosition;
         cameraPivot.localRotation = lyingRotation;
 
-        if (playerInteractor != null)
+        bool dialogueStarted =
+            dialogueManager.PlayDialogue(wakeUpSequence);
+
+        Debug.Log(
+    "WakeUp Dialogue Started: " + dialogueStarted
+);
+
+        Debug.Log(
+            "WakeUp Sequence: " + wakeUpSequence.name
+        );
+
+        if (!dialogueStarted)
         {
-            playerInteractor.ShowInnerMonologue(
-                wakingThought,
-                thoughtDuration
+            Debug.LogError(
+                "Wake Up dialogue baslatilamadi!",
+                this
             );
         }
 
@@ -104,48 +118,5 @@ public class WakeUpIntro : MonoBehaviour
 
         cameraPivot.localPosition = standingPosition;
         cameraPivot.localRotation = standingRotation;
-
-        RestoreControls();
-
-        if (playerInteractor != null)
-        {
-            playerInteractor.ShowInnerMonologue(
-                gettingUpThought,
-                thoughtDuration
-            );
-        }
-    }
-
-
-    private void DisableControls()
-    {
-        previousControlStates =
-            new bool[controlsToDisable.Length];
-
-        for (int i = 0; i < controlsToDisable.Length; i++)
-        {
-            if (controlsToDisable[i] == null)
-                continue;
-
-            previousControlStates[i] =
-                controlsToDisable[i].enabled;
-
-            controlsToDisable[i].enabled = false;
-        }
-    }
-
-    private void RestoreControls()
-    {
-        if (previousControlStates == null)
-            return;
-
-        for (int i = 0; i < controlsToDisable.Length; i++)
-        {
-            if (controlsToDisable[i] == null)
-                continue;
-
-            controlsToDisable[i].enabled =
-                previousControlStates[i];
-        }
     }
 }

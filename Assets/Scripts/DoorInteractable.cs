@@ -1,22 +1,18 @@
 
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class DoorInteractable : MonoBehaviour
 {
-    private Collider[] doorColliders;
-
     [Header("Interaction")]
     [SerializeField] private bool canOpen = false;
+    [SerializeField] private string inspectPrompt = "E - Inspect";
 
-    [SerializeField] private string inspectPrompt = "E - Open";
-
-    [SerializeField, TextArea(2, 4)]
-    private string roomMessage =
-        "nothing special here.";
-
-    [SerializeField, TextArea(2, 4)]
-    private string openMessage = "";
+    [Header("Dialogue")]
+    [SerializeField] private DialogueManager dialogueManager;
+    [SerializeField] private DialogueSequence inspectionSequence;
+    [SerializeField] private DialogueSequence firstOpenSequence;
 
     [Header("Door Pivot")]
     [SerializeField] private Transform doorPivot;
@@ -29,9 +25,21 @@ public class DoorInteractable : MonoBehaviour
 
     [SerializeField] private float rotationDuration = 0.5f;
 
+    [Header("Story Conditions")]
+    [SerializeField] private ToiletInteractable toiletInteractable;
+
+    [Header("Events")]
+    [SerializeField] private UnityEvent onFirstOpened;
+
     private Quaternion baseLocalRotation;
+
     private bool isOpen;
     private bool isAnimating;
+
+    private bool hasShownOpenMessage = false;
+    private bool hasTriggeredFirstOpenEvent = false;
+
+    private Collider[] doorColliders;
 
     private void Awake()
     {
@@ -40,6 +48,9 @@ public class DoorInteractable : MonoBehaviour
 
         baseLocalRotation = doorPivot.localRotation;
 
+        doorColliders =
+            GetComponentsInChildren<Collider>(true);
+
         float initialAngle = startsAjar
             ? ajarAngle
             : closedAngle;
@@ -47,8 +58,6 @@ public class DoorInteractable : MonoBehaviour
         doorPivot.localRotation =
             baseLocalRotation *
             Quaternion.Euler(0f, initialAngle, 0f);
-
-        doorColliders = GetComponentsInChildren<Collider>(true);
     }
 
     public string GetPrompt()
@@ -59,7 +68,6 @@ public class DoorInteractable : MonoBehaviour
         return isOpen ? "E - Close" : "E - Open";
     }
 
-
     public void Interact(PlayerInteractor interactor)
     {
         if (isAnimating)
@@ -67,10 +75,14 @@ public class DoorInteractable : MonoBehaviour
 
         if (!canOpen)
         {
-            interactor.ShowDoorInspection(
-                roomMessage,
-                this
-            );
+            if (dialogueManager != null &&
+                inspectionSequence != null)
+            {
+                dialogueManager.PlayDialogue(
+                    inspectionSequence,
+                    transform
+                );
+            }
 
             return;
         }
@@ -79,12 +91,24 @@ public class DoorInteractable : MonoBehaviour
 
         if (isOpen)
         {
-            if (!string.IsNullOrWhiteSpace(openMessage))
+            if (!hasTriggeredFirstOpenEvent &&
+                toiletInteractable != null &&
+                toiletInteractable.HasBeenUsed)
             {
-                interactor.ShowInnerMonologue(
-                    openMessage,
-                    2.5f
+                hasTriggeredFirstOpenEvent = true;
+                onFirstOpened?.Invoke();
+            }
+
+            if (!hasShownOpenMessage &&
+                firstOpenSequence != null &&
+                dialogueManager != null)
+            {
+                bool started = dialogueManager.PlayDialogue(
+                    firstOpenSequence
                 );
+
+                if (started)
+                    hasShownOpenMessage = true;
             }
         }
 
@@ -95,12 +119,12 @@ public class DoorInteractable : MonoBehaviour
         StartCoroutine(RotateDoor(targetAngle));
     }
 
-
     private IEnumerator RotateDoor(float targetAngle)
     {
         isAnimating = true;
 
-        Quaternion startRotation = doorPivot.localRotation;
+        Quaternion startRotation =
+            doorPivot.localRotation;
 
         Quaternion targetRotation =
             baseLocalRotation *
@@ -112,9 +136,9 @@ public class DoorInteractable : MonoBehaviour
         {
             elapsed += Time.deltaTime;
 
-            float t = Mathf.Clamp01(
-                elapsed / rotationDuration
-            );
+            float t = rotationDuration > 0f
+                ? Mathf.Clamp01(elapsed / rotationDuration)
+                : 1f;
 
             doorPivot.localRotation = Quaternion.Slerp(
                 startRotation,
@@ -126,14 +150,16 @@ public class DoorInteractable : MonoBehaviour
         }
 
         doorPivot.localRotation = targetRotation;
+
         isAnimating = false;
     }
 
     public bool IsWithinInteractionRange(
-    Vector3 playerPosition,
-    float maxDistance)
+        Vector3 playerPosition,
+        float maxDistance)
     {
-        if (doorColliders == null || doorColliders.Length == 0)
+        if (doorColliders == null ||
+            doorColliders.Length == 0)
         {
             return Vector3.Distance(
                 playerPosition,
@@ -141,24 +167,23 @@ public class DoorInteractable : MonoBehaviour
             ) <= maxDistance;
         }
 
-        float closestDistance = float.MaxValue;
-
         foreach (Collider col in doorColliders)
         {
             if (col == null || !col.enabled)
                 continue;
 
-            Vector3 closestPoint = col.ClosestPoint(playerPosition);
+            Vector3 closestPoint =
+                col.ClosestPoint(playerPosition);
 
-            float distance = Vector3.Distance(
+            if (Vector3.Distance(
                 playerPosition,
                 closestPoint
-            );
-
-            if (distance < closestDistance)
-                closestDistance = distance;
+            ) <= maxDistance)
+            {
+                return true;
+            }
         }
 
-        return closestDistance <= maxDistance;
+        return false;
     }
 }

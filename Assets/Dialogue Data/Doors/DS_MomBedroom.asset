@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac47604e0c605234481ffad835f9c468, type: 3}
+  m_Name: DS_MomBedroom
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueSequence
+  dialogueType: 1
+  lines:
+  - speakerName: 
+    dialogueText: mom is sleeping. i must be quiet.
+    revealMode: 0
+    charactersPerSecond: 35
+    wordsPerSecond: 8
+    duration: 3
+    pauseAfter: 0
+    voiceClip: {fileID: 0}
+  freezePlayer: 0
+  advanceWithInput: 0
+  cancelWhenOutOfRange: 1
+  cancelDistance: 2.5
+  priority: 10
